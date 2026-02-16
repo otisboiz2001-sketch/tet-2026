@@ -239,12 +239,7 @@
 }
 
  
-.slide img{
-  width:100%;
-  height:100%;
-  object-fit: contain;     /* HIỆN FULL ẢNH */
-  object-position: center;
-}
+
 
     .caption{
       position:absolute;
@@ -413,6 +408,62 @@
   filter: drop-shadow(0 10px 26px rgba(0,0,0,.55));
 }
 
+    .fxText{
+  position:absolute;
+  inset: 14px;
+  pointer-events:none;
+  z-index: 9;
+  width: calc(100% - 28px);
+  height: calc(100% - 28px);
+}
+.fxBox{
+  position:absolute;
+  max-width: min(92%, 520px);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(0,0,0,.22);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  transform-origin: center;
+}
+.fxTitle{
+  font-weight: 950;
+  letter-spacing: .6px;
+  font-size: clamp(18px, 3.6vw, 30px);
+  background: linear-gradient(90deg, rgba(255,215,140,.98), rgba(200,200,255,.95), rgba(255,150,210,.95));
+  -webkit-background-clip: text;
+  background-clip:text;
+  color: transparent;
+  text-shadow: 0 10px 26px rgba(0,0,0,.55);
+}
+.fxLines{
+  margin-top: 6px;
+  font-weight: 700;
+  color: rgba(255,255,255,.90);
+  text-shadow: 0 10px 22px rgba(0,0,0,.55);
+  line-height: 1.25;
+}
+.fxLines .line{ margin-top: 4px; opacity:.92; }
+
+.fxBox.pop{ animation: fxPop .75s cubic-bezier(.2,.9,.2,1) both; }
+.fxBox.bounce{ animation: fxBounce .9s cubic-bezier(.2,.9,.2,1) both; }
+.fxBox.wave{ animation: fxWave 1.2s ease both; }
+
+@keyframes fxPop{
+  from{ opacity:0; transform: translateY(10px) scale(.92); filter: blur(2px); }
+  to{ opacity:1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes fxBounce{
+  0%{ opacity:0; transform: translateY(18px) scale(.9); }
+  70%{ opacity:1; transform: translateY(-6px) scale(1.02); }
+  100%{ opacity:1; transform: translateY(0) scale(1); }
+}
+@keyframes fxWave{
+  from{ opacity:0; transform: translateY(12px) rotate(-2deg) scale(.95); }
+  to{ opacity:1; transform: translateY(0) rotate(0deg) scale(1); }
+}
+
 .fxText.show .l3{ animation: popLine .9s ease forwards; animation-delay: .60s; }
 .fxText.show .l4{ animation: popLine .9s ease forwards; animation-delay: .85s; }
 .fxText.show .l5{ animation: popLine .9s ease forwards; animation-delay: 1.10s; }
@@ -459,14 +510,8 @@
   <!-- overlay hiệu ứng -->
   <canvas id="fx" class="fx"></canvas>
 
-  <div id="fxText" class="fxText">
-    <div class="hny">Happy New Year 🎆</div>
-    <div class="line l1">Chúc bạn cục cưng năm mới vui vè  ✨</div>
-    <div class="line l2">Nhiều may mắn – nhiều niềm vui - nhiều tiền hơn  💖</div>
-    <div class="line 13"> Yêu anh nhiều hơn ❤️</div>
-    <div class="line 14"> Thuận lợi trong công việc nha ❤️</div>
-    <div class="line 15"> Yêu em nhiều lắm ❤️</div>
-  </div>
+  <div id="fxText" class="fxText"></div>
+    
 </section>
 
 
@@ -784,18 +829,63 @@ function tick(){
     raf = null;
   }
 }
-function showFxText(title, l1, l2){
-  fxText.querySelector('.hny').textContent = title || "Happy New Year 🎆";
-  fxText.querySelector('.l1').textContent = l1 || "Chúc bạn một năm mới thật rực rỡ ✨";
-  fxText.querySelector('.l2').textContent = l2 || "Nhiều may mắn – nhiều niềm vui 💖";
+function rand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-  fxText.classList.remove('show');
-  void fxText.offsetWidth;
-  fxText.classList.add('show');
+function showFxText(i){
+  const s = slides[i] || {};
+  const pool = [
+    "Chúc mừng năm mới nè ✨",
+    "Cười nhiều hơn, vui nhiều hơn 🥰",
+    "Mọi điều tốt lành sẽ đến 🍀",
+    "Giàu hơn x2, vui hơn x10 💰",
+    "Bình an – hạnh phúc – may mắn 💝",
+    "Yêu em/anh nhiều lắm ❤️",
+    "Thuận lợi trong công việc nha 💼",
+    "Mãi bên nhau nha 🤗",
+    "Đáng yêu quá trời luôn 🐰",
+    "Mã đáo thành công 🐎"
+  ];
 
-  // tự ẩn text sau ~2.5s
-  setTimeout(() => fxText.classList.remove('show'), 2500);
+  const title = pick([
+    "Happy New Year 🎆",
+    "Chúc mừng năm mới 🧧",
+    "2026 is coming ✨",
+    s.title || "Khoảnh khắc đáng nhớ 💖"
+  ]);
+
+  // random 2-4 dòng
+  const n = rand(2,4);
+  const lines = [];
+  for(let k=0;k<n;k++) lines.push(pick(pool));
+
+  // nếu sub không phải "..." thì ưu tiên làm dòng đầu
+  if(s.sub && s.sub !== "...") lines[0] = s.sub;
+
+  // random vị trí (né caption dưới)
+  const x = rand(10, 90);
+  const y = rand(8, 55);
+  const align = pick(["left","center","right"]);
+  const variant = pick(["pop","bounce","wave"]);
+
+  fxText.innerHTML = `
+    <div class="fxBox ${variant}" style="
+      left:${x}%;
+      top:${y}%;
+      transform: translate(-${x}%, -${y}%);
+      text-align:${align};
+    ">
+      <div class="fxTitle">${title}</div>
+      <div class="fxLines">
+        ${lines.map(t => `<div class="line">${t}</div>`).join("")}
+      </div>
+    </div>
+  `;
+
+  // tự ẩn sau 2.6s
+  setTimeout(() => { fxText.innerHTML = ""; }, 2600);
 }
+
 
 function celebrateSlide(i){
   if(!canvas.width) resizeFx();
@@ -818,7 +908,8 @@ function celebrateSlide(i){
 
   // dùng title/sub của slide để làm text luôn (cute + đúng ảnh)
   const s = slides[i] || {};
-  showFxText("Happy New Year 🎆", s.title || "Chúc mừng năm mới!", s.sub || "Luôn bình an và hạnh phúc 💝");
+  showFxText(i);
+
 }
     // startBtn.addEventListener('click', () => {
     //   animateYearSwap();
