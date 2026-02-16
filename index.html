@@ -376,7 +376,18 @@
       setTimeout(() => { ySwap.textContent = '2026'; }, 550);
     }
     // chạy sớm cho vui
-    setTimeout(animateYearSwap, 600);
+    // setTimeout(animateYearSwap, 600);
+    // chạy tự động khi vào web
+setTimeout(() => {
+  animateYearSwap();
+
+  // sau khi đổi năm xong thì tự qua slide
+  setTimeout(() => {
+    startSlideshow();
+  }, 1500);
+
+}, 600);
+
 
     // ====== 2) SLIDES: ẢNH DEMO (SVG DATA) — BẠN CÓ THỂ THAY BẰNG ẢNH THẬT ======
     // Nếu bạn có ảnh thật, thay src: "img/1.jpg", "img/2.jpg"... và upload vào repo.
@@ -506,10 +517,12 @@
       setTimeout(() => (confettiBox.innerHTML = ""), 6000);
     }
 
-    startBtn.addEventListener('click', () => {
-      animateYearSwap();
-      startSlideshow();
-    });
+    // startBtn.addEventListener('click', () => {
+    //   animateYearSwap();
+    //   startSlideshow();
+    // });
+
+    
 
     replayBtn.addEventListener('click', () => {
       clearInterval(timer);
