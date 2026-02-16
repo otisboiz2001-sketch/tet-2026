@@ -330,47 +330,46 @@
     }
 
     /* FX text container */
-    .fxText{
-      position:absolute;
-      inset: 14px;
-      pointer-events:none;
-      z-index: 9;
-      width: calc(100% - 28px);
-      height: calc(100% - 28px);
-      mix-blend-mode: screen;
-    }
+   /* container phủ stage */
+.fxText{
+  position:absolute;
+  inset: 14px;
+  z-index: 9;
+  pointer-events:none;
+}
 
-    .fxBox{
-      position:absolute;
-      max-width: min(92%, 540px);
-      padding: 10px 14px;
-      border-radius: 16px;
-      background: rgba(0,0,0,.22);
-      border: 1px solid rgba(255,255,255,.12);
-      backdrop-filter: blur(8px);
-      box-shadow: 0 18px 40px rgba(0,0,0,.35);
-      transform-origin: center;
-      overflow:hidden;
-    }
+/* box chữ nằm dưới, full ngang */
+.fxBox{
+  position:absolute;
+  left: 50%;
+  bottom: 16px;             /* 👈 nằm dưới */
+  top: auto !important;
+  transform: translateX(-50%);
+  width: min(92%, 720px);   /* 👈 rộng ra cho chữ ngang */
+  max-width: none;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(0,0,0,.28);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  text-align: center;       /* 👈 dễ đọc */
+}
 
-    .fxTitle{
-      font-weight: 950;
-      letter-spacing: .6px;
-      font-size: clamp(18px, 3.6vw, 30px);
-      background: linear-gradient(90deg, rgba(255,215,140,.98), rgba(200,200,255,.95), rgba(255,150,210,.95));
-      -webkit-background-clip: text;
-      background-clip:text;
-      color: transparent;
-      text-shadow: 0 10px 26px rgba(0,0,0,.55);
-    }
-    .fxLines{
-      margin-top: 6px;
-      font-weight: 750;
-      color: rgba(255,255,255,.92);
-      text-shadow: 0 10px 22px rgba(0,0,0,.55);
-      line-height: 1.25;
-    }
-    .fxLines .line{ margin-top: 4px; opacity:.95; }
+/* chữ xuống dòng đẹp */
+.fxLines{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content:center;
+  line-height: 1.25;
+}
+.fxLines .line{
+  margin:0;
+  white-space: nowrap;      /* 👈 ép nằm ngang từng câu */
+  opacity:.95;
+}
+
 
     /* variants */
     .fxBox.pop{ animation: fxPop .75s cubic-bezier(.2,.9,.2,1) both; }
@@ -548,7 +547,7 @@
 
         el.appendChild(bg);
         el.appendChild(img);
-        el.appendChild(cap);
+     
         stage.appendChild(el);
       });
     }
@@ -783,19 +782,15 @@ const align = "left";  // hoặc "center"
 const variant = "pop"; // cố định 1 kiểu
 
       fxText.innerHTML = `
-        <div class="fxBox ${variant}" style="
-          left:${x}%;
-          top:${y}%;
-          transform: translate(-50%, -50%);
-          text-align:${align};
-        ">
-          <div class="fxTitle">${title}</div>
-          <div class="fxLines">
-            ${lines.map(t => `<div class="line">${t}</div>`).join("")}
-          </div>
-        </div>
-      `;
-      setTimeout(() => { fxText.innerHTML = ""; }, 3400);
+  <div class="fxBox pop">
+    <div class="fxTitle">${title}</div>
+    <div class="fxLines">
+      ${lines.map(t => `<div class="line">${t}</div>`).join("")}
+    </div>
+  </div>
+`;
+setTimeout(() => { fxText.innerHTML = ""; }, 3400);
+
     }
 
     // ====== Replay ======
