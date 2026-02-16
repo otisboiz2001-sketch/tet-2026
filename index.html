@@ -657,53 +657,223 @@
       }
     }
 
-    function tick(){
-      const w = canvas.getBoundingClientRect().width;
-      const h = canvas.getBoundingClientRect().height;
-      ctx.clearRect(0,0,w,h);
+    // function tick(){
+    //   const w = canvas.getBoundingClientRect().width;
+    //   const h = canvas.getBoundingClientRect().height;
+    //   ctx.clearRect(0,0,w,h);
 
-      particles = particles.filter(p => p.life < p.max);
+    //   particles = particles.filter(p => p.life < p.max);
 
-      for(const p of particles){
-        p.life++;
-        p.vy += p.g;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.r += p.vr;
+    //   for(const p of particles){
+    //     p.life++;
+    //     p.vy += p.g;
+    //     p.x += p.vx;
+    //     p.y += p.vy;
+    //     p.r += p.vr;
 
-        const t = p.life / p.max;
-        const alpha = (1 - t) * 0.95;
+    //     const t = p.life / p.max;
+    //     const alpha = (1 - t) * 0.95;
 
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.r);
-        ctx.globalAlpha = alpha;
+    //     ctx.save();
+    //     ctx.translate(p.x, p.y);
+    //     ctx.rotate(p.r);
+    //     ctx.globalAlpha = alpha;
 
-        if(p.kind === "heart"){
-          ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, 1)`;
-          ctx.shadowColor = `hsla(${p.hue}, 95%, 72%, .65)`;
-          ctx.shadowBlur = 22;
-          heartPath(ctx, 0, 0, p.s);
-          ctx.fill();
-        }else{
-          ctx.fillStyle = `hsla(${p.hue}, 95%, 80%, 1)`;
-          ctx.shadowColor = `hsla(${p.hue}, 95%, 80%, .65)`;
-          ctx.shadowBlur = 14;
-          ctx.beginPath();
-          ctx.arc(0,0,p.s,0,Math.PI*2);
-          ctx.fill();
-        }
+    //     if(p.kind === "heart"){
+    //       ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, 1)`;
+    //       ctx.shadowColor = `hsla(${p.hue}, 95%, 72%, .65)`;
+    //       ctx.shadowBlur = 22;
+    //       heartPath(ctx, 0, 0, p.s);
+    //       ctx.fill();
+    //     }else{
+    //       ctx.fillStyle = `hsla(${p.hue}, 95%, 80%, 1)`;
+    //       ctx.shadowColor = `hsla(${p.hue}, 95%, 80%, .65)`;
+    //       ctx.shadowBlur = 14;
+    //       ctx.beginPath();
+    //       ctx.arc(0,0,p.s,0,Math.PI*2);
+    //       ctx.fill();
+    //     }
 
-        ctx.restore();
-      }
+    //     ctx.restore();
+    //   }
 
-      if(particles.length){
-        raf = requestAnimationFrame(tick);
-      }else{
-        cancelAnimationFrame(raf);
-        raf = null;
-      }
+    //   if(particles.length){
+    //     raf = requestAnimationFrame(tick);
+    //   }else{
+    //     cancelAnimationFrame(raf);
+    //     raf = null;
+    //   }
+    // }
+    // ===== ROCKETS (launch from bottom then burst) =====
+let rockets = [];
+
+function launchRocket(opts = {}){
+  const { w, h } = rectWH();
+
+  const x = opts.x ?? w * rand(0.12, 0.88);
+  const y = h + rand(20, 60);              // start below stage
+  const peakY = h * rand(0.12, 0.55);      // explode height (avoid caption)
+  const vx = rand(-0.6, 0.6);
+  const vy = -rand(6.2, 9.2);              // upward speed
+  const hue = opts.hue ?? randi(0, 359);
+
+  rockets.push({
+    x, y, vx, vy,
+    peakY,
+    hue,
+    life: 0,
+    max: randi(55, 85), // safety
+  });
+}
+
+function tick(){
+  const { w, h } = rectWH();
+
+  // trail fade
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fillRect(0,0,w,h);
+  ctx.restore();
+
+  // ---- update & draw rockets ----
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  rockets = rockets.filter(r => r.life < r.max && r.y > -80);
+
+  for(const r of rockets){
+    r.life++;
+    // simple physics
+    r.vy += 0.06;     // gravity slows ascent
+    r.x += r.vx;
+    r.y += r.vy;
+
+    // draw rocket head + tail
+    const a = Math.max(0, Math.min(1, 1 - r.life / r.max));
+    ctx.save();
+    ctx.globalAlpha = 0.95 * a;
+
+    // tail (a few dots behind)
+    for(let t=0;t<6;t++){
+      const px = r.x - r.vx * t * 2.6 + rand(-0.8,0.8);
+      const py = r.y - r.vy * t * 2.6 + rand(-0.8,0.8);
+      ctx.shadowColor = `hsla(${r.hue}, 95%, 70%, .55)`;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = `hsla(${(r.hue+20*t)%360}, 95%, ${78-2*t}%, 1)`;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.2 - t*0.2, 0, Math.PI*2);
+      ctx.fill();
     }
+
+    // head
+    ctx.shadowColor = `hsla(${r.hue}, 95%, 75%, .75)`;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = `hsla(${r.hue}, 95%, 75%, 1)`;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, 2.6, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // explode condition: reached peak (or vy turned positive)
+    if(r.y <= r.peakY || r.vy > -0.5){
+      spawnBurst({x: r.x, y: r.y}, { mult: rand(0.9,1.35), spread: rand(1.0,1.25), baseHue: r.hue });
+      // remove rocket by expiring it
+      r.life = r.max;
+    }
+  }
+
+  // ---- update & draw particles (same as before) ----
+  particles = particles.filter(p => p.life < p.max);
+
+  for(const p of particles){
+    p.life++;
+    p.vy += p.g;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.r += p.vr;
+    p.tw += 0.25;
+
+    const t = p.life / p.max;
+    const alpha = (1 - t) * 0.95;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.r);
+    ctx.globalAlpha = alpha;
+
+    const glow = 10 + 18*(1-t);
+    const sat = 95;
+    const lum = 72 + 8*Math.sin(p.tw);
+
+    if(p.kind === "heart"){
+      ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum}%, 1)`;
+      ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum}%, .75)`;
+      ctx.shadowBlur = glow;
+      heartPath(ctx, 0, 0, p.s);
+      ctx.fill();
+    }else if(p.kind === "star"){
+      ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum+6}%, 1)`;
+      ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum+6}%, .75)`;
+      ctx.shadowBlur = glow;
+      starPath(ctx, 0, 0, p.s, randi(4,6), rand(0.35, 0.55));
+      ctx.fill();
+    }else if(p.kind === "emoji"){
+      ctx.font = `700 ${p.s}px system-ui, Apple Color Emoji, Segoe UI Emoji`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = `hsla(${p.hue}, 95%, 70%, .55)`;
+      ctx.shadowBlur = glow;
+      ctx.fillText(p.emoji, 0, 0);
+    }else{
+      ctx.fillStyle = `hsla(${p.hue}, 95%, 84%, 1)`;
+      ctx.shadowColor = `hsla(${p.hue}, 95%, 84%, .65)`;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(0,0,p.s,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  if(particles.length || rockets.length){
+    raf = requestAnimationFrame(tick);
+  }else{
+    cancelAnimationFrame(raf);
+    raf = null;
+    ctx.clearRect(0,0,w,h);
+  }
+}
+
+// ===== replace celebrateSlide(i) with rocket-style =====
+function celebrateSlide(i){
+  if(!canvas.width) resizeFx();
+
+  // launch 3–6 rockets immediately
+  const first = randi(3, 6);
+  for(let k=0;k<first;k++){
+    launchRocket({ hue: randi(0,359) });
+  }
+
+  // keep launching rockets for ~1.9s (like real show)
+  const start = performance.now();
+  const duration = 1900;
+  (function loop(){
+    const now = performance.now();
+    if(now - start < duration){
+      const n = randi(1, 2);
+      for(let t=0;t<n;t++) launchRocket({ hue: randi(0,359) });
+      setTimeout(loop, randi(160, 260));
+    }
+  })();
+
+  if(!raf) tick();
+  showFxText(i);
+}
+
 
     // ====== Random cute text per slide (position + animation variant) ======
     function rand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
@@ -767,37 +937,38 @@
       // tự ẩn sau 2.6s
       setTimeout(() => { fxText.innerHTML = ""; }, 2600);
     }
+    
 
-    function celebrateSlide(i){
-      if(!canvas.width) resizeFx();
+    // function celebrateSlide(i){
+    //   if(!canvas.width) resizeFx();
 
-      // bắn liên tục 1.6s cho đã mắt
-      burstHearts(1);
-      const start = performance.now();
-      const duration = 1600;
+    //   // bắn liên tục 1.6s cho đã mắt
+    //   burstHearts(1);
+    //   const start = performance.now();
+    //   const duration = 1600;
 
-      (function loop(){
-        const now = performance.now();
-        if(now - start < duration){
-          burstHearts(0.35);
-          setTimeout(loop, 220);
-        }
-      })();
+    //   (function loop(){
+    //     const now = performance.now();
+    //     if(now - start < duration){
+    //       burstHearts(0.35);
+    //       setTimeout(loop, 220);
+    //     }
+    //   })();
 
-      if(!raf) tick();
-      showFxText(i);
-    }
+    //   if(!raf) tick();
+    //   showFxText(i);
+    // }
 
-    // Replay
-    replayBtn.addEventListener('click', () => {
-      clearInterval(timer);
-      ySwap.textContent = "2025";
-      showLayer(step1);
-      setTimeout(() => {
-        animateYearSwap();
-        setTimeout(() => startSlideshow(), 1500);
-      }, 500);
-    });
+    // // Replay
+    // replayBtn.addEventListener('click', () => {
+    //   clearInterval(timer);
+    //   ySwap.textContent = "2025";
+    //   showLayer(step1);
+    //   setTimeout(() => {
+    //     animateYearSwap();
+    //     setTimeout(() => startSlideshow(), 1500);
+    //   }, 500);
+    // });
   </script>
 </body>
 </html>
