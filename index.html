@@ -585,267 +585,192 @@
       setTimeout(() => (confettiBox.innerHTML = ""), 6000);
     }
 
-    // ====== FX: ROCKET from bottom + burst hearts/stars/emojis ======
-    const canvas = document.getElementById('fx');
-    const ctx = canvas.getContext('2d', { alpha: true });
-    const fxText = document.getElementById('fxText');
+  // ====== FX: Rocket fireworks (simple dots) ======
+const canvas = document.getElementById('fx');
+const ctx = canvas.getContext('2d', { alpha: true });
+const fxText = document.getElementById('fxText'); // giữ để show text của bạn vẫn chạy
 
-    function fxRect(){
-      const r = canvas.getBoundingClientRect();
-      return { w: r.width, h: r.height };
+function fxRect(){
+  const r = canvas.getBoundingClientRect();
+  return { w: r.width, h: r.height };
+}
+function resizeFx(){
+  const { w, h } = fxRect();
+  canvas.width  = Math.floor(w * devicePixelRatio);
+  canvas.height = Math.floor(h * devicePixelRatio);
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+window.addEventListener('resize', resizeFx);
+
+function rf(min, max){ return Math.random()*(max-min)+min; }
+function ri(min, max){ return Math.floor(rf(min, max+1)); }
+
+let rockets = [];
+let sparks  = [];
+let raf = null;
+
+function launchRocket(){
+  const { w, h } = fxRect();
+  const x = w * rf(0.08, 0.92);
+  const y = h + rf(20, 80);
+  const peakY = h * rf(0.12, 0.60);
+
+  rockets.push({
+    x, y,
+    vx: rf(-0.9, 0.9),
+    vy: -rf(7.0, 10.5),
+    peakY,
+    hue: ri(0,359),
+    life: 0,
+    max: ri(55, 95)
+  });
+}
+
+function explode(x, y, hue){
+  // nổ hạt sáng (dots)
+  const count = ri(90, 150);
+  for(let i=0;i<count;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = rf(1.8, 5.2);
+    sparks.push({
+      x, y,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp - rf(0.6, 1.8),
+      g: rf(0.035, 0.06),
+      r: rf(1.2, 2.8),
+      hue: (hue + ri(-25,25)) % 360,
+      life: 0,
+      max: ri(45, 90)
+    });
+  }
+
+  // thêm vài tia rơi nhẹ (cho “rực” hơn)
+  const fall = ri(18, 35);
+  const { w } = fxRect();
+  for(let i=0;i<fall;i++){
+    sparks.push({
+      x: Math.random()*w,
+      y: -rf(10, 60),
+      vx: rf(-0.4, 0.4),
+      vy: rf(1.0, 2.6),
+      g: 0.01,
+      r: rf(0.9, 1.8),
+      hue: ri(0,359),
+      life: 0,
+      max: ri(70, 120)
+    });
+  }
+}
+
+function tickFx(){
+  const { w, h } = fxRect();
+
+  // trail fade: để lại vệt (nhìn đẹp) - giảm alpha nếu muốn ít tối
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.10)";
+  ctx.fillRect(0,0,w,h);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  // rockets update
+  rockets = rockets.filter(r => r.life < r.max && r.y > -140);
+  for(const r of rockets){
+    r.life++;
+    r.vy += 0.07; // gravity
+    r.x += r.vx;
+    r.y += r.vy;
+
+    // tail
+    const alpha = Math.max(0, 1 - r.life/r.max);
+    ctx.save();
+    ctx.globalAlpha = 0.9 * alpha;
+    for(let t=0;t<8;t++){
+      const px = r.x - r.vx * t * 2.8 + rf(-0.6, 0.6);
+      const py = r.y - r.vy * t * 2.8 + rf(-0.6, 0.6);
+      ctx.shadowColor = `hsla(${r.hue}, 95%, 70%, .55)`;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = `hsla(${(r.hue + t*18)%360}, 95%, ${78 - t*2}%, 1)`;
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(0.7, 2.5 - t*0.25), 0, Math.PI*2);
+      ctx.fill();
     }
-    function resizeFx(){
-      const { w, h } = fxRect();
-      canvas.width  = Math.floor(w * devicePixelRatio);
-      canvas.height = Math.floor(h * devicePixelRatio);
-      ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    // head
+    ctx.shadowColor = `hsla(${r.hue}, 95%, 75%, .75)`;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = `hsla(${r.hue}, 95%, 75%, 1)`;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, 2.6, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // explode when reached peak
+    if(r.y <= r.peakY || r.vy > -0.2){
+      explode(r.x, r.y, r.hue);
+      r.life = r.max; // kill rocket
     }
-    window.addEventListener('resize', resizeFx);
+  }
 
-    // float helpers (KHÔNG đụng tên rand/int dùng cho text)
-    function fxRand(min, max){ return Math.random()*(max-min)+min; }
-    function fxRandi(min, max){ return Math.floor(fxRand(min, max+1)); }
-    function fxPick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  // sparks update
+  sparks = sparks.filter(p => p.life < p.max);
+  for(const p of sparks){
+    p.life++;
+    p.vy += p.g;
+    p.x += p.vx;
+    p.y += p.vy;
 
-    // shapes
-    function heartPath(c, x, y, s){
-      c.beginPath();
-      c.moveTo(x, y + s*0.3);
-      c.bezierCurveTo(x, y, x - s, y, x - s, y + s*0.6);
-      c.bezierCurveTo(x - s, y + s*1.15, x, y + s*1.3, x, y + s*1.6);
-      c.bezierCurveTo(x, y + s*1.3, x + s, y + s*1.15, x + s, y + s*0.6);
-      c.bezierCurveTo(x + s, y, x, y, x, y + s*0.3);
-      c.closePath();
+    const t = p.life / p.max;
+    const alpha = (1 - t) * 0.95;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = `hsla(${p.hue}, 95%, 72%, .65)`;
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = `hsla(${p.hue}, 95%, 78%, 1)`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  if(rockets.length || sparks.length){
+    raf = requestAnimationFrame(tickFx);
+  }else{
+    cancelAnimationFrame(raf);
+    raf = null;
+    ctx.clearRect(0,0,w,h);
+  }
+}
+
+// gọi mỗi lần chuyển slide
+function celebrateSlide(i){
+  if(!canvas.width) resizeFx();
+
+  // bắn loạt đầu (random vị trí)
+  const first = ri(3, 6);
+  for(let k=0;k<first;k++) launchRocket();
+
+  // bắn thêm liên tục ~1.6s
+  const start = performance.now();
+  const duration = 1600;
+  (function loop(){
+    const now = performance.now();
+    if(now - start < duration){
+      const n = ri(1, 2);
+      for(let t=0;t<n;t++) launchRocket();
+      setTimeout(loop, ri(140, 240));
     }
+  })();
 
-    function starPath(c, x, y, r, spikes=5, inner=0.5){
-      let rot = Math.PI / 2 * 3;
-      let step = Math.PI / spikes;
-      c.beginPath();
-      c.moveTo(x, y - r);
-      for(let i=0;i<spikes;i++){
-        c.lineTo(x + Math.cos(rot) * r, y + Math.sin(rot) * r);
-        rot += step;
-        c.lineTo(x + Math.cos(rot) * (r*inner), y + Math.sin(rot) * (r*inner));
-        rot += step;
-      }
-      c.lineTo(x, y - r);
-      c.closePath();
-    }
+  if(!raf) tickFx();
 
-    const EMOJIS = ["🐱","🐴","⭐","✨","💖","❤️","💫","🧧","🎆","🎇"];
-
-    let particles = [];
-    let rockets = [];
-    let raf = null;
-
-    function spawnBurst(pos, opts = {}){
-      const { x, y } = pos;
-      const mult = opts.mult ?? 1;
-      const spread = opts.spread ?? 1;
-      const baseHue = opts.baseHue ?? fxRandi(0,359);
-
-      const count = Math.floor((70 + Math.random()*60) * mult);
-      for(let i=0;i<count;i++){
-        const a = (Math.PI*2) * Math.random();
-        const sp = (2.0 + Math.random()*4.5) * spread;
-
-        // mix types
-        const roll = Math.random();
-        let kind = "heart";
-        if(roll > 0.60 && roll <= 0.86) kind = "star";
-        if(roll > 0.86) kind = "emoji";
-
-        particles.push({
-          kind,
-          emoji: kind === "emoji" ? fxPick(EMOJIS) : null,
-          x, y,
-          vx: Math.cos(a)*sp,
-          vy: Math.sin(a)*sp - (1.2 + Math.random()*2.0),
-          g: 0.05 + Math.random()*0.06,
-          s: kind === "emoji" ? (16 + Math.random()*18) : (6 + Math.random()*12),
-          r: Math.random()*Math.PI,
-          vr: (-0.18 + Math.random()*0.36),
-          life: 0,
-          max: 55 + Math.floor(Math.random()*55),
-          hue: (baseHue + fxRandi(-40, 40) + fxRandi(0, 80)) % 360,
-          tw: Math.random()*Math.PI*2
-        });
-      }
-
-      // ambient sparkles
-      const { w, h } = fxRect();
-      const sparkCount = Math.floor(22 * mult);
-      for(let i=0;i<sparkCount;i++){
-        particles.push({
-          kind: "spark",
-          x: Math.random()*w,
-          y: -20 - Math.random()*50,
-          vx: (-0.5 + Math.random()*1.0),
-          vy: 1.1 + Math.random()*2.6,
-          g: 0.01,
-          s: 1.2 + Math.random()*2.2,
-          r: 0,
-          vr: 0,
-          life: 0,
-          max: 80 + Math.floor(Math.random()*50),
-          hue: fxRandi(0,359),
-          tw: Math.random()*Math.PI*2
-        });
-      }
-    }
-
-    function launchRocket(opts = {}){
-      const { w, h } = fxRect();
-
-      const x = opts.x ?? w * fxRand(0.12, 0.88);
-      const y = h + fxRand(20, 70);
-      const peakY = h * fxRand(0.12, 0.55);
-      const vx = fxRand(-0.7, 0.7);
-      const vy = -fxRand(6.4, 9.6);
-      const hue = opts.hue ?? fxRandi(0,359);
-
-      rockets.push({ x,y,vx,vy,peakY,hue,life:0,max:fxRandi(55, 95) });
-    }
-
-    function tickFx(){
-      const { w, h } = fxRect();
-
-      // trail fade (mượt, không che ảnh quá nhiều)
-      ctx.save();
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.fillRect(0,0,w,h);
-      ctx.restore();
-
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-
-      // rockets
-      rockets = rockets.filter(r => r.life < r.max && r.y > -120);
-      for(const r of rockets){
-        r.life++;
-        r.vy += 0.06;
-        r.x += r.vx;
-        r.y += r.vy;
-
-        const a = Math.max(0, Math.min(1, 1 - r.life / r.max));
-        ctx.save();
-        ctx.globalAlpha = 0.95 * a;
-
-        // tail dots
-        for(let t=0;t<7;t++){
-          const px = r.x - r.vx * t * 2.6 + fxRand(-0.8,0.8);
-          const py = r.y - r.vy * t * 2.6 + fxRand(-0.8,0.8);
-          ctx.shadowColor = `hsla(${r.hue}, 95%, 70%, .55)`;
-          ctx.shadowBlur = 14;
-          ctx.fillStyle = `hsla(${(r.hue+20*t)%360}, 95%, ${78-2*t}%, 1)`;
-          ctx.beginPath();
-          ctx.arc(px, py, 2.4 - t*0.22, 0, Math.PI*2);
-          ctx.fill();
-        }
-
-        // head
-        ctx.shadowColor = `hsla(${r.hue}, 95%, 75%, .75)`;
-        ctx.shadowBlur = 18;
-        ctx.fillStyle = `hsla(${r.hue}, 95%, 75%, 1)`;
-        ctx.beginPath();
-        ctx.arc(r.x, r.y, 2.8, 0, Math.PI*2);
-        ctx.fill();
-
-        ctx.restore();
-
-        if(r.y <= r.peakY || r.vy > -0.4){
-          spawnBurst({x: r.x, y: r.y}, { mult: fxRand(1.0, 1.6), spread: fxRand(1.0, 1.3), baseHue: r.hue });
-          r.life = r.max;
-        }
-      }
-
-      // particles
-      particles = particles.filter(p => p.life < p.max);
-      for(const p of particles){
-        p.life++;
-        p.vy += p.g;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.r += p.vr;
-        p.tw += 0.25;
-
-        const t = p.life / p.max;
-        const alpha = (1 - t) * 0.95;
-
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.r);
-        ctx.globalAlpha = alpha;
-
-        const glow = 10 + 18*(1-t);
-        const sat = 95;
-        const lum = 72 + 8*Math.sin(p.tw);
-
-        if(p.kind === "heart"){
-          ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum}%, 1)`;
-          ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum}%, .75)`;
-          ctx.shadowBlur = glow;
-          heartPath(ctx, 0, 0, p.s);
-          ctx.fill();
-        }else if(p.kind === "star"){
-          ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum+6}%, 1)`;
-          ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum+6}%, .75)`;
-          ctx.shadowBlur = glow;
-          starPath(ctx, 0, 0, p.s, fxRandi(4,6), fxRand(0.35, 0.55));
-          ctx.fill();
-        }else if(p.kind === "emoji"){
-          ctx.font = `700 ${p.s}px system-ui, Apple Color Emoji, Segoe UI Emoji`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.shadowColor = `hsla(${p.hue}, 95%, 70%, .55)`;
-          ctx.shadowBlur = glow;
-          ctx.fillText(p.emoji, 0, 0);
-        }else{
-          ctx.fillStyle = `hsla(${p.hue}, 95%, 84%, 1)`;
-          ctx.shadowColor = `hsla(${p.hue}, 95%, 84%, .65)`;
-          ctx.shadowBlur = 12;
-          ctx.beginPath();
-          ctx.arc(0,0,p.s,0,Math.PI*2);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-
-      ctx.restore();
-
-      if(particles.length || rockets.length){
-        raf = requestAnimationFrame(tickFx);
-      }else{
-        cancelAnimationFrame(raf);
-        raf = null;
-        ctx.clearRect(0,0,w,h);
-      }
-    }
-
-    function celebrateSlide(i){
-      if(!canvas.width) resizeFx();
-
-      // bắn 3-6 quả pháo từ dưới lên
-      const first = fxRandi(3, 6);
-      for(let k=0;k<first;k++) launchRocket({ hue: fxRandi(0,359) });
-
-      // bắn thêm 1-2 quả mỗi 160-260ms trong ~1.9s
-      const start = performance.now();
-      const duration = 1900;
-      (function loop(){
-        const now = performance.now();
-        if(now - start < duration){
-          const n = fxRandi(1, 2);
-          for(let t=0;t<n;t++) launchRocket({ hue: fxRandi(0,359) });
-          setTimeout(loop, fxRandi(160, 260));
-        }
-      })();
-
-      if(!raf) tickFx();
-      showFxText(i);
-    }
+  // giữ text overlay của bạn
+  showFxText(i);
+}
 
     // ====== Cute text per slide (int helper riêng) ======
     function intRand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
