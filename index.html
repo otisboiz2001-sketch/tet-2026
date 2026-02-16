@@ -400,6 +400,26 @@
     @media (prefers-reduced-motion: reduce){
       .stars,.stars2,.handoff .mid,.bigwish,.slide,.layer,.swap{ animation:none !important; transition:none !important; }
     }
+
+    /* cute glow */
+.fxText{
+  mix-blend-mode: screen;
+}
+.hny{
+  background: linear-gradient(90deg, rgba(255,215,140,.98), rgba(200,200,255,.95), rgba(255,150,210,.95));
+  -webkit-background-clip: text;
+  background-clip:text;
+  color: transparent;
+  filter: drop-shadow(0 10px 26px rgba(0,0,0,.55));
+}
+
+.fxText.show .l3{ animation: popLine .9s ease forwards; animation-delay: .60s; }
+.fxText.show .l4{ animation: popLine .9s ease forwards; animation-delay: .85s; }
+.fxText.show .l5{ animation: popLine .9s ease forwards; animation-delay: 1.10s; }
+
+/* sparkle layer is same canvas, but add extra softness */
+.fx{ filter: drop-shadow(0 12px 22px rgba(0,0,0,.25)); }
+
   </style>
 </head>
 <body>
@@ -575,7 +595,7 @@ el.appendChild(img);
         cap.className = "caption";
         cap.innerHTML = `${s.title || ""}<small>${s.sub || ""}</small>`;
 
-        el.appendChild(img);
+       
         el.appendChild(cap);
         stage.appendChild(el);
       });
@@ -668,39 +688,61 @@ function heartPath(ctx, x, y, s){
   ctx.closePath();
 }
 
-function burstHearts(){
+function burstHearts(mult = 1){
   const w = canvas.getBoundingClientRect().width;
   const h = canvas.getBoundingClientRect().height;
 
-  const cx = w * (0.35 + Math.random()*0.3);
-  const cy = h * (0.28 + Math.random()*0.25);
+  const cx = w * (0.25 + Math.random()*0.5);
+  const cy = h * (0.18 + Math.random()*0.35);
 
-  const count = 42;
+  const count = Math.floor((65 + Math.random()*35) * mult); // nhiều hơn
   for(let i=0;i<count;i++){
-    const a = (Math.PI*2) * (i/count) + (Math.random()*0.25);
-    const sp = 2.2 + Math.random()*2.6;
+    const a = (Math.PI*2) * Math.random();
+    const sp = 2.4 + Math.random()*3.8;
+
     particles.push({
+      kind: "heart",
       x: cx, y: cy,
       vx: Math.cos(a)*sp,
-      vy: Math.sin(a)*sp - (1.2 + Math.random()*1.4),
-      g: 0.06 + Math.random()*0.04,
-      s: 6 + Math.random()*8,
+      vy: Math.sin(a)*sp - (1.4 + Math.random()*1.8),
+      g: 0.05 + Math.random()*0.05,
+      s: 6 + Math.random()*10,
       r: Math.random()*Math.PI,
-      vr: (-0.12 + Math.random()*0.24),
+      vr: (-0.16 + Math.random()*0.32),
       life: 0,
-      max: 55 + Math.floor(Math.random()*25),
+      max: 60 + Math.floor(Math.random()*40),
+      hue: Math.floor(Math.random()*360)
+    });
+  }
+
+  // sparkle rơi nhẹ
+  const sparkCount = 40;
+  for(let i=0;i<sparkCount;i++){
+    particles.push({
+      kind: "spark",
+      x: Math.random()*w,
+      y: -20 - Math.random()*50,
+      vx: (-0.4 + Math.random()*0.8),
+      vy: 1.0 + Math.random()*2.2,
+      g: 0.01,
+      s: 1.5 + Math.random()*2.2,
+      r: 0,
+      vr: 0,
+      life: 0,
+      max: 90 + Math.floor(Math.random()*40),
       hue: Math.floor(Math.random()*360)
     });
   }
 }
 
+
 function tick(){
   const w = canvas.getBoundingClientRect().width;
   const h = canvas.getBoundingClientRect().height;
-
   ctx.clearRect(0,0,w,h);
 
   particles = particles.filter(p => p.life < p.max);
+
   for(const p of particles){
     p.life++;
     p.vy += p.g;
@@ -715,12 +757,23 @@ function tick(){
     ctx.translate(p.x, p.y);
     ctx.rotate(p.r);
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = `hsla(${p.hue}, 95%, 70%, 1)`;
-    ctx.shadowColor = `hsla(${p.hue}, 95%, 70%, .6)`;
-    ctx.shadowBlur = 18;
 
-    heartPath(ctx, 0, 0, p.s);
-    ctx.fill();
+    if(p.kind === "heart"){
+      ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, 1)`;
+      ctx.shadowColor = `hsla(${p.hue}, 95%, 72%, .65)`;
+      ctx.shadowBlur = 22;
+      heartPath(ctx, 0, 0, p.s);
+      ctx.fill();
+    }else{
+      // sparkle
+      ctx.fillStyle = `hsla(${p.hue}, 95%, 80%, 1)`;
+      ctx.shadowColor = `hsla(${p.hue}, 95%, 80%, .65)`;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(0,0,p.s,0,Math.PI*2);
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 
@@ -731,7 +784,6 @@ function tick(){
     raf = null;
   }
 }
-
 function showFxText(title, l1, l2){
   fxText.querySelector('.hny').textContent = title || "Happy New Year 🎆";
   fxText.querySelector('.l1').textContent = l1 || "Chúc bạn một năm mới thật rực rỡ ✨";
@@ -747,22 +799,27 @@ function showFxText(title, l1, l2){
 
 function celebrateSlide(i){
   if(!canvas.width) resizeFx();
-  // bắn 2 lần cho “pháo hoa” đã hơn
-  burstHearts();
-  setTimeout(burstHearts, 220);
+
+  // bắn liên tục 1.6s cho đã mắt
+  burstHearts(1);
+  const start = performance.now();
+  const duration = 1600;
+
+  function loop(){
+    const now = performance.now();
+    if(now - start < duration){
+      burstHearts(0.35); // bắn nhỏ liên tục
+      setTimeout(loop, 220);
+    }
+  }
+  loop();
 
   if(!raf) tick();
 
-  // chữ theo từng slide (tùy bạn sửa)
-  const msg = [
-    ["Happy New Year 🎆", "Một năm cũ khép lại", "Cảm ơn vì đã cố gắng thật nhiều 💖"],
-    ["Happy New Year 🎆", "Bắt đầu 2026", "Mọi điều tốt lành sẽ đến ✨"],
-    ["Happy New Year 🎆", "Chúc bạn bứt phá", "Vạn sự như ý – mã đáo thành công 🐎"]
-  ];
-  const pick = msg[i] || ["Happy New Year 🎆", "Chúc mừng năm mới!", "Luôn bình an và hạnh phúc 💝"];
-  showFxText(pick[0], pick[1], pick[2]);
+  // dùng title/sub của slide để làm text luôn (cute + đúng ảnh)
+  const s = slides[i] || {};
+  showFxText("Happy New Year 🎆", s.title || "Chúc mừng năm mới!", s.sub || "Luôn bình an và hạnh phúc 💝");
 }
-
     // startBtn.addEventListener('click', () => {
     //   animateYearSwap();
     //   startSlideshow();
