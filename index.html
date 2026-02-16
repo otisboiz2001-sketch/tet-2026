@@ -347,7 +347,7 @@
     }
     .fxLines .line{ margin-top: 4px; opacity:.95; }
 
-    /* Variants: pop/bounce/wave + EXTRA cute: type/glitch/float */
+    /* variants */
     .fxBox.pop{ animation: fxPop .75s cubic-bezier(.2,.9,.2,1) both; }
     .fxBox.bounce{ animation: fxBounce .9s cubic-bezier(.2,.9,.2,1) both; }
     .fxBox.wave{ animation: fxWave 1.2s ease both; }
@@ -381,7 +381,7 @@
       100%{ opacity:1; transform: translate(-50%,-50%) translateX(0) skewX(0); }
     }
 
-    /* Type effect: reveal lines */
+    /* type effect */
     .fxBox.type .fxLines .line{
       width: 0;
       white-space: nowrap;
@@ -392,7 +392,6 @@
     .fxBox.type .fxLines .line:nth-child(2){ animation-delay:.08s, .08s; }
     .fxBox.type .fxLines .line:nth-child(3){ animation-delay:.16s, .16s; }
     .fxBox.type .fxLines .line:nth-child(4){ animation-delay:.24s, .24s; }
-
     @keyframes typing{ to{ width: 100%; } }
     @keyframes caret{ 50%{ border-color: transparent; } }
 
@@ -458,6 +457,7 @@
   <script>
     // ====== STEP1: year swap -> auto start slideshow ======
     const ySwap = document.getElementById('ySwap');
+
     function animateYearSwap(){
       ySwap.classList.remove('go');
       void ySwap.offsetWidth;
@@ -470,7 +470,7 @@
       setTimeout(() => startSlideshow(), 1500);
     }, 600);
 
-    // ====== Slides list (đặt đúng tên file .jpg trong repo của bạn) ======
+    // ====== Slides list (đặt đúng tên file .jpg trong thư mục) ======
     const slides = [
       { src: "00.jpg", title: "Kỷ niệm 1", sub: "..." },
       { src: "11.jpg", title: "Kỷ niệm 2", sub: "..." },
@@ -585,303 +585,274 @@
       setTimeout(() => (confettiBox.innerHTML = ""), 6000);
     }
 
-    // ====== Heart fireworks + sparkles ======
+    // ====== FX: ROCKET from bottom + burst hearts/stars/emojis ======
     const canvas = document.getElementById('fx');
     const ctx = canvas.getContext('2d', { alpha: true });
     const fxText = document.getElementById('fxText');
 
+    function fxRect(){
+      const r = canvas.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    }
     function resizeFx(){
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = Math.floor(rect.width * devicePixelRatio);
-      canvas.height = Math.floor(rect.height * devicePixelRatio);
+      const { w, h } = fxRect();
+      canvas.width  = Math.floor(w * devicePixelRatio);
+      canvas.height = Math.floor(h * devicePixelRatio);
       ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
     }
     window.addEventListener('resize', resizeFx);
 
-    let particles = [];
-    let raf = null;
+    // float helpers (KHÔNG đụng tên rand/int dùng cho text)
+    function fxRand(min, max){ return Math.random()*(max-min)+min; }
+    function fxRandi(min, max){ return Math.floor(fxRand(min, max+1)); }
+    function fxPick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-    function heartPath(ctx, x, y, s){
-      ctx.beginPath();
-      ctx.moveTo(x, y + s*0.3);
-      ctx.bezierCurveTo(x, y, x - s, y, x - s, y + s*0.6);
-      ctx.bezierCurveTo(x - s, y + s*1.15, x, y + s*1.3, x, y + s*1.6);
-      ctx.bezierCurveTo(x, y + s*1.3, x + s, y + s*1.15, x + s, y + s*0.6);
-      ctx.bezierCurveTo(x + s, y, x, y, x, y + s*0.3);
-      ctx.closePath();
+    // shapes
+    function heartPath(c, x, y, s){
+      c.beginPath();
+      c.moveTo(x, y + s*0.3);
+      c.bezierCurveTo(x, y, x - s, y, x - s, y + s*0.6);
+      c.bezierCurveTo(x - s, y + s*1.15, x, y + s*1.3, x, y + s*1.6);
+      c.bezierCurveTo(x, y + s*1.3, x + s, y + s*1.15, x + s, y + s*0.6);
+      c.bezierCurveTo(x + s, y, x, y, x, y + s*0.3);
+      c.closePath();
     }
 
-    function burstHearts(mult = 1){
-      const w = canvas.getBoundingClientRect().width;
-      const h = canvas.getBoundingClientRect().height;
+    function starPath(c, x, y, r, spikes=5, inner=0.5){
+      let rot = Math.PI / 2 * 3;
+      let step = Math.PI / spikes;
+      c.beginPath();
+      c.moveTo(x, y - r);
+      for(let i=0;i<spikes;i++){
+        c.lineTo(x + Math.cos(rot) * r, y + Math.sin(rot) * r);
+        rot += step;
+        c.lineTo(x + Math.cos(rot) * (r*inner), y + Math.sin(rot) * (r*inner));
+        rot += step;
+      }
+      c.lineTo(x, y - r);
+      c.closePath();
+    }
 
-      const cx = w * (0.25 + Math.random()*0.5);
-      const cy = h * (0.18 + Math.random()*0.35);
+    const EMOJIS = ["🐱","🐴","⭐","✨","💖","❤️","💫","🧧","🎆","🎇"];
 
-      const count = Math.floor((65 + Math.random()*35) * mult);
+    let particles = [];
+    let rockets = [];
+    let raf = null;
+
+    function spawnBurst(pos, opts = {}){
+      const { x, y } = pos;
+      const mult = opts.mult ?? 1;
+      const spread = opts.spread ?? 1;
+      const baseHue = opts.baseHue ?? fxRandi(0,359);
+
+      const count = Math.floor((70 + Math.random()*60) * mult);
       for(let i=0;i<count;i++){
         const a = (Math.PI*2) * Math.random();
-        const sp = 2.4 + Math.random()*3.8;
+        const sp = (2.0 + Math.random()*4.5) * spread;
+
+        // mix types
+        const roll = Math.random();
+        let kind = "heart";
+        if(roll > 0.60 && roll <= 0.86) kind = "star";
+        if(roll > 0.86) kind = "emoji";
 
         particles.push({
-          kind: "heart",
-          x: cx, y: cy,
+          kind,
+          emoji: kind === "emoji" ? fxPick(EMOJIS) : null,
+          x, y,
           vx: Math.cos(a)*sp,
-          vy: Math.sin(a)*sp - (1.4 + Math.random()*1.8),
-          g: 0.05 + Math.random()*0.05,
-          s: 6 + Math.random()*10,
+          vy: Math.sin(a)*sp - (1.2 + Math.random()*2.0),
+          g: 0.05 + Math.random()*0.06,
+          s: kind === "emoji" ? (16 + Math.random()*18) : (6 + Math.random()*12),
           r: Math.random()*Math.PI,
-          vr: (-0.16 + Math.random()*0.32),
+          vr: (-0.18 + Math.random()*0.36),
           life: 0,
-          max: 60 + Math.floor(Math.random()*40),
-          hue: Math.floor(Math.random()*360)
+          max: 55 + Math.floor(Math.random()*55),
+          hue: (baseHue + fxRandi(-40, 40) + fxRandi(0, 80)) % 360,
+          tw: Math.random()*Math.PI*2
         });
       }
 
-      const sparkCount = 40;
+      // ambient sparkles
+      const { w, h } = fxRect();
+      const sparkCount = Math.floor(22 * mult);
       for(let i=0;i<sparkCount;i++){
         particles.push({
           kind: "spark",
           x: Math.random()*w,
           y: -20 - Math.random()*50,
-          vx: (-0.4 + Math.random()*0.8),
-          vy: 1.0 + Math.random()*2.2,
+          vx: (-0.5 + Math.random()*1.0),
+          vy: 1.1 + Math.random()*2.6,
           g: 0.01,
-          s: 1.5 + Math.random()*2.2,
+          s: 1.2 + Math.random()*2.2,
           r: 0,
           vr: 0,
           life: 0,
-          max: 90 + Math.floor(Math.random()*40),
-          hue: Math.floor(Math.random()*360)
+          max: 80 + Math.floor(Math.random()*50),
+          hue: fxRandi(0,359),
+          tw: Math.random()*Math.PI*2
         });
       }
     }
 
-    // function tick(){
-    //   const w = canvas.getBoundingClientRect().width;
-    //   const h = canvas.getBoundingClientRect().height;
-    //   ctx.clearRect(0,0,w,h);
+    function launchRocket(opts = {}){
+      const { w, h } = fxRect();
 
-    //   particles = particles.filter(p => p.life < p.max);
+      const x = opts.x ?? w * fxRand(0.12, 0.88);
+      const y = h + fxRand(20, 70);
+      const peakY = h * fxRand(0.12, 0.55);
+      const vx = fxRand(-0.7, 0.7);
+      const vy = -fxRand(6.4, 9.6);
+      const hue = opts.hue ?? fxRandi(0,359);
 
-    //   for(const p of particles){
-    //     p.life++;
-    //     p.vy += p.g;
-    //     p.x += p.vx;
-    //     p.y += p.vy;
-    //     p.r += p.vr;
-
-    //     const t = p.life / p.max;
-    //     const alpha = (1 - t) * 0.95;
-
-    //     ctx.save();
-    //     ctx.translate(p.x, p.y);
-    //     ctx.rotate(p.r);
-    //     ctx.globalAlpha = alpha;
-
-    //     if(p.kind === "heart"){
-    //       ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, 1)`;
-    //       ctx.shadowColor = `hsla(${p.hue}, 95%, 72%, .65)`;
-    //       ctx.shadowBlur = 22;
-    //       heartPath(ctx, 0, 0, p.s);
-    //       ctx.fill();
-    //     }else{
-    //       ctx.fillStyle = `hsla(${p.hue}, 95%, 80%, 1)`;
-    //       ctx.shadowColor = `hsla(${p.hue}, 95%, 80%, .65)`;
-    //       ctx.shadowBlur = 14;
-    //       ctx.beginPath();
-    //       ctx.arc(0,0,p.s,0,Math.PI*2);
-    //       ctx.fill();
-    //     }
-
-    //     ctx.restore();
-    //   }
-
-    //   if(particles.length){
-    //     raf = requestAnimationFrame(tick);
-    //   }else{
-    //     cancelAnimationFrame(raf);
-    //     raf = null;
-    //   }
-    // }
-    // ===== ROCKETS (launch from bottom then burst) =====
-let rockets = [];
-
-function launchRocket(opts = {}){
-  const { w, h } = rectWH();
-
-  const x = opts.x ?? w * rand(0.12, 0.88);
-  const y = h + rand(20, 60);              // start below stage
-  const peakY = h * rand(0.12, 0.55);      // explode height (avoid caption)
-  const vx = rand(-0.6, 0.6);
-  const vy = -rand(6.2, 9.2);              // upward speed
-  const hue = opts.hue ?? randi(0, 359);
-
-  rockets.push({
-    x, y, vx, vy,
-    peakY,
-    hue,
-    life: 0,
-    max: randi(55, 85), // safety
-  });
-}
-
-function tick(){
-  const { w, h } = rectWH();
-
-  // trail fade
-  ctx.save();
-  ctx.globalCompositeOperation = "source-over";
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.fillRect(0,0,w,h);
-  ctx.restore();
-
-  // ---- update & draw rockets ----
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-
-  rockets = rockets.filter(r => r.life < r.max && r.y > -80);
-
-  for(const r of rockets){
-    r.life++;
-    // simple physics
-    r.vy += 0.06;     // gravity slows ascent
-    r.x += r.vx;
-    r.y += r.vy;
-
-    // draw rocket head + tail
-    const a = Math.max(0, Math.min(1, 1 - r.life / r.max));
-    ctx.save();
-    ctx.globalAlpha = 0.95 * a;
-
-    // tail (a few dots behind)
-    for(let t=0;t<6;t++){
-      const px = r.x - r.vx * t * 2.6 + rand(-0.8,0.8);
-      const py = r.y - r.vy * t * 2.6 + rand(-0.8,0.8);
-      ctx.shadowColor = `hsla(${r.hue}, 95%, 70%, .55)`;
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = `hsla(${(r.hue+20*t)%360}, 95%, ${78-2*t}%, 1)`;
-      ctx.beginPath();
-      ctx.arc(px, py, 2.2 - t*0.2, 0, Math.PI*2);
-      ctx.fill();
+      rockets.push({ x,y,vx,vy,peakY,hue,life:0,max:fxRandi(55, 95) });
     }
 
-    // head
-    ctx.shadowColor = `hsla(${r.hue}, 95%, 75%, .75)`;
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = `hsla(${r.hue}, 95%, 75%, 1)`;
-    ctx.beginPath();
-    ctx.arc(r.x, r.y, 2.6, 0, Math.PI*2);
-    ctx.fill();
+    function tickFx(){
+      const { w, h } = fxRect();
 
-    ctx.restore();
+      // trail fade (mượt, không che ảnh quá nhiều)
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(0,0,0,0.12)";
+      ctx.fillRect(0,0,w,h);
+      ctx.restore();
 
-    // explode condition: reached peak (or vy turned positive)
-    if(r.y <= r.peakY || r.vy > -0.5){
-      spawnBurst({x: r.x, y: r.y}, { mult: rand(0.9,1.35), spread: rand(1.0,1.25), baseHue: r.hue });
-      // remove rocket by expiring it
-      r.life = r.max;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+
+      // rockets
+      rockets = rockets.filter(r => r.life < r.max && r.y > -120);
+      for(const r of rockets){
+        r.life++;
+        r.vy += 0.06;
+        r.x += r.vx;
+        r.y += r.vy;
+
+        const a = Math.max(0, Math.min(1, 1 - r.life / r.max));
+        ctx.save();
+        ctx.globalAlpha = 0.95 * a;
+
+        // tail dots
+        for(let t=0;t<7;t++){
+          const px = r.x - r.vx * t * 2.6 + fxRand(-0.8,0.8);
+          const py = r.y - r.vy * t * 2.6 + fxRand(-0.8,0.8);
+          ctx.shadowColor = `hsla(${r.hue}, 95%, 70%, .55)`;
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = `hsla(${(r.hue+20*t)%360}, 95%, ${78-2*t}%, 1)`;
+          ctx.beginPath();
+          ctx.arc(px, py, 2.4 - t*0.22, 0, Math.PI*2);
+          ctx.fill();
+        }
+
+        // head
+        ctx.shadowColor = `hsla(${r.hue}, 95%, 75%, .75)`;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = `hsla(${r.hue}, 95%, 75%, 1)`;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 2.8, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+
+        if(r.y <= r.peakY || r.vy > -0.4){
+          spawnBurst({x: r.x, y: r.y}, { mult: fxRand(1.0, 1.6), spread: fxRand(1.0, 1.3), baseHue: r.hue });
+          r.life = r.max;
+        }
+      }
+
+      // particles
+      particles = particles.filter(p => p.life < p.max);
+      for(const p of particles){
+        p.life++;
+        p.vy += p.g;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.r += p.vr;
+        p.tw += 0.25;
+
+        const t = p.life / p.max;
+        const alpha = (1 - t) * 0.95;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.r);
+        ctx.globalAlpha = alpha;
+
+        const glow = 10 + 18*(1-t);
+        const sat = 95;
+        const lum = 72 + 8*Math.sin(p.tw);
+
+        if(p.kind === "heart"){
+          ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum}%, 1)`;
+          ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum}%, .75)`;
+          ctx.shadowBlur = glow;
+          heartPath(ctx, 0, 0, p.s);
+          ctx.fill();
+        }else if(p.kind === "star"){
+          ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum+6}%, 1)`;
+          ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum+6}%, .75)`;
+          ctx.shadowBlur = glow;
+          starPath(ctx, 0, 0, p.s, fxRandi(4,6), fxRand(0.35, 0.55));
+          ctx.fill();
+        }else if(p.kind === "emoji"){
+          ctx.font = `700 ${p.s}px system-ui, Apple Color Emoji, Segoe UI Emoji`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.shadowColor = `hsla(${p.hue}, 95%, 70%, .55)`;
+          ctx.shadowBlur = glow;
+          ctx.fillText(p.emoji, 0, 0);
+        }else{
+          ctx.fillStyle = `hsla(${p.hue}, 95%, 84%, 1)`;
+          ctx.shadowColor = `hsla(${p.hue}, 95%, 84%, .65)`;
+          ctx.shadowBlur = 12;
+          ctx.beginPath();
+          ctx.arc(0,0,p.s,0,Math.PI*2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      if(particles.length || rockets.length){
+        raf = requestAnimationFrame(tickFx);
+      }else{
+        cancelAnimationFrame(raf);
+        raf = null;
+        ctx.clearRect(0,0,w,h);
+      }
     }
-  }
 
-  // ---- update & draw particles (same as before) ----
-  particles = particles.filter(p => p.life < p.max);
+    function celebrateSlide(i){
+      if(!canvas.width) resizeFx();
 
-  for(const p of particles){
-    p.life++;
-    p.vy += p.g;
-    p.x += p.vx;
-    p.y += p.vy;
-    p.r += p.vr;
-    p.tw += 0.25;
+      // bắn 3-6 quả pháo từ dưới lên
+      const first = fxRandi(3, 6);
+      for(let k=0;k<first;k++) launchRocket({ hue: fxRandi(0,359) });
 
-    const t = p.life / p.max;
-    const alpha = (1 - t) * 0.95;
+      // bắn thêm 1-2 quả mỗi 160-260ms trong ~1.9s
+      const start = performance.now();
+      const duration = 1900;
+      (function loop(){
+        const now = performance.now();
+        if(now - start < duration){
+          const n = fxRandi(1, 2);
+          for(let t=0;t<n;t++) launchRocket({ hue: fxRandi(0,359) });
+          setTimeout(loop, fxRandi(160, 260));
+        }
+      })();
 
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.r);
-    ctx.globalAlpha = alpha;
-
-    const glow = 10 + 18*(1-t);
-    const sat = 95;
-    const lum = 72 + 8*Math.sin(p.tw);
-
-    if(p.kind === "heart"){
-      ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum}%, 1)`;
-      ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum}%, .75)`;
-      ctx.shadowBlur = glow;
-      heartPath(ctx, 0, 0, p.s);
-      ctx.fill();
-    }else if(p.kind === "star"){
-      ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${lum+6}%, 1)`;
-      ctx.shadowColor = `hsla(${p.hue}, ${sat}%, ${lum+6}%, .75)`;
-      ctx.shadowBlur = glow;
-      starPath(ctx, 0, 0, p.s, randi(4,6), rand(0.35, 0.55));
-      ctx.fill();
-    }else if(p.kind === "emoji"){
-      ctx.font = `700 ${p.s}px system-ui, Apple Color Emoji, Segoe UI Emoji`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = `hsla(${p.hue}, 95%, 70%, .55)`;
-      ctx.shadowBlur = glow;
-      ctx.fillText(p.emoji, 0, 0);
-    }else{
-      ctx.fillStyle = `hsla(${p.hue}, 95%, 84%, 1)`;
-      ctx.shadowColor = `hsla(${p.hue}, 95%, 84%, .65)`;
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.arc(0,0,p.s,0,Math.PI*2);
-      ctx.fill();
+      if(!raf) tickFx();
+      showFxText(i);
     }
-    ctx.restore();
-  }
 
-  ctx.restore();
-
-  if(particles.length || rockets.length){
-    raf = requestAnimationFrame(tick);
-  }else{
-    cancelAnimationFrame(raf);
-    raf = null;
-    ctx.clearRect(0,0,w,h);
-  }
-}
-
-// ===== replace celebrateSlide(i) with rocket-style =====
-function celebrateSlide(i){
-  if(!canvas.width) resizeFx();
-
-  // launch 3–6 rockets immediately
-  const first = randi(3, 6);
-  for(let k=0;k<first;k++){
-    launchRocket({ hue: randi(0,359) });
-  }
-
-  // keep launching rockets for ~1.9s (like real show)
-  const start = performance.now();
-  const duration = 1900;
-  (function loop(){
-    const now = performance.now();
-    if(now - start < duration){
-      const n = randi(1, 2);
-      for(let t=0;t<n;t++) launchRocket({ hue: randi(0,359) });
-      setTimeout(loop, randi(160, 260));
-    }
-  })();
-
-  if(!raf) tick();
-  showFxText(i);
-}
-
-
-    // ====== Random cute text per slide (position + animation variant) ======
-    function rand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+    // ====== Cute text per slide (int helper riêng) ======
+    function intRand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
     function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
     function showFxText(i){
       const s = slides[i] || {};
-
       const pool = [
         "Chúc mừng năm mới nha ✨",
         "Cười nhiều hơn, vui nhiều hơn nè 🥰",
@@ -890,7 +861,7 @@ function celebrateSlide(i){
         "Bình an – hạnh phúc – may mắn 💝",
         "Yêu em nhiều lắm ❤️",
         "Thuận lợi trong công việc nha 💼",
-        "Mãi bên nhau nha cục cưng  🤗",
+        "Mãi bên nhau nha cục cưng 🤗",
         "Khởi nghiệp mau giàu có để nuôi anh nhé 🐰",
         "Mã đáo thành công 🐎",
         "Tết này thật rực rỡ 🎆",
@@ -904,20 +875,14 @@ function celebrateSlide(i){
         s.title || "Khoảnh khắc đáng nhớ 💖"
       ]);
 
-      // random 2-4 dòng
-      const n = rand(2,4);
+      const n = intRand(2,4);
       const lines = [];
       for(let k=0;k<n;k++) lines.push(pick(pool));
-
-      // nếu sub không phải "..." thì ưu tiên làm dòng đầu
       if(s.sub && s.sub !== "...") lines[0] = s.sub;
 
-      // random vị trí (né caption dưới)
-      const x = rand(12, 88);
-      const y = rand(12, 45);
+      const x = intRand(12, 88);
+      const y = intRand(12, 45);
       const align = pick(["left","center","right"]);
-
-      // random kiểu chữ nhảy
       const variant = pick(["pop","bounce","wave","float","type","glitch"]);
 
       fxText.innerHTML = `
@@ -933,42 +898,27 @@ function celebrateSlide(i){
           </div>
         </div>
       `;
-
-      // tự ẩn sau 2.6s
       setTimeout(() => { fxText.innerHTML = ""; }, 2600);
     }
-    
 
-    // function celebrateSlide(i){
-    //   if(!canvas.width) resizeFx();
+    // ====== Replay ======
+    replayBtn.addEventListener('click', () => {
+      clearInterval(timer);
+      // reset year text
+      ySwap.textContent = "2025";
+      showLayer(step1);
 
-    //   // bắn liên tục 1.6s cho đã mắt
-    //   burstHearts(1);
-    //   const start = performance.now();
-    //   const duration = 1600;
+      // reset FX
+      particles = [];
+      rockets = [];
+      if(raf){ cancelAnimationFrame(raf); raf = null; }
+      ctx.clearRect(0,0,fxRect().w, fxRect().h);
 
-    //   (function loop(){
-    //     const now = performance.now();
-    //     if(now - start < duration){
-    //       burstHearts(0.35);
-    //       setTimeout(loop, 220);
-    //     }
-    //   })();
-
-    //   if(!raf) tick();
-    //   showFxText(i);
-    // }
-
-    // // Replay
-    // replayBtn.addEventListener('click', () => {
-    //   clearInterval(timer);
-    //   ySwap.textContent = "2025";
-    //   showLayer(step1);
-    //   setTimeout(() => {
-    //     animateYearSwap();
-    //     setTimeout(() => startSlideshow(), 1500);
-    //   }, 500);
-    // });
+      setTimeout(() => {
+        animateYearSwap();
+        setTimeout(() => startSlideshow(), 1500);
+      }, 500);
+    });
   </script>
 </body>
 </html>
