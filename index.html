@@ -298,6 +298,8 @@
     .fx{
       position:absolute;
       inset: 14px;
+      width: calc(100% - 28px);   /* 👈 thêm */
+  height: calc(100% - 28px);  /* 👈 thêm */
       border-radius: calc(var(--radius) - 6px);
       pointer-events:none;
       z-index: 8;
@@ -538,10 +540,16 @@
     }
 
     function startSlideshow(){
-      idx = 0;
-      buildSlides();
-      showLayer(step2);
-      showSlide(idx);
+  idx = 0;
+  buildSlides();
+
+  showLayer(step2);
+
+  // 👇 THÊM DÒNG NÀY (QUAN TRỌNG NHẤT)
+  requestAnimationFrame(() => resizeFx());
+
+  showSlide(idx);
+
 
       clearInterval(timer);
       timer = setInterval(() => {
