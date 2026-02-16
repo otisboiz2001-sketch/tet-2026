@@ -186,20 +186,42 @@
       background: rgba(0,0,0,.18);
     }
     .slide{
-      position:absolute;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      opacity:0;
-      transform: scale(1.03);
-      transition: opacity 1s ease, transform 3.8s ease;
-      background: rgba(0,0,0,.55);
-    }
-    .slide.show{
-      opacity:1;
-      transform: scale(1);
-    }
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;
+  transform: scale(1.02);
+  transition: opacity 1s ease;
+  background: rgba(0,0,0,.55);
+}
+
+.slide.show{
+  opacity:1;
+}
+
+/* hiệu ứng slow cho ảnh foreground */
+.slide.show .fg{
+  animation: kenburns 3.8s ease-in-out forwards;
+  will-change: transform;
+}
+
+/* nếu muốn background blur cũng slow nhẹ */
+.slide.show .bg-blur{
+  animation: kenburnsBg 3.8s ease-in-out forwards;
+  will-change: transform;
+}
+
+@keyframes kenburns{
+  from{ transform: scale(1.00) translate(0px, 0px); }
+  to  { transform: scale(1.07) translate(-10px, -6px); }
+}
+@keyframes kenburnsBg{
+  from{ transform: scale(1.08) translate(0px, 0px); }
+  to  { transform: scale(1.13) translate(8px, 6px); }
+}
+
     .slide .bg-blur{
       position:absolute;
       inset:-12px;
@@ -755,10 +777,10 @@ function celebrateSlide(i){
       for(let k=0;k<n;k++) lines.push(pick(pool));
       if(s.sub && s.sub !== "...") lines[0] = s.sub;
 
-      const x = intRand(12, 88);
-      const y = intRand(12, 45);
-      const align = pick(["left","center","right"]);
-      const variant = pick(["pop","bounce","wave","float","type","glitch"]);
+     const x = 70;      // % ngang (bạn đổi tuỳ ý)
+const y = 22;      // % dọc
+const align = "left";  // hoặc "center"
+const variant = "pop"; // cố định 1 kiểu
 
       fxText.innerHTML = `
         <div class="fxBox ${variant}" style="
@@ -773,7 +795,7 @@ function celebrateSlide(i){
           </div>
         </div>
       `;
-      setTimeout(() => { fxText.innerHTML = ""; }, 2600);
+      setTimeout(() => { fxText.innerHTML = ""; }, 3400);
     }
 
     // ====== Replay ======
